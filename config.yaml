@@ -1,0 +1,13 @@
+homeserver:
+    address: http://localhost:8008
+    domain: localhost
+
+appservice:
+    https: false
+    host: 127.0.0.1
+    port: 10007
+    db_name: imposter.db
+
+bot:
+    displayname: 'ImposterBot'
+    avatar: 'mxc://localhost/uFBVkbeCCRFKRxvtgRyvhiSl'

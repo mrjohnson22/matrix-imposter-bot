@@ -1,0 +1,9 @@
+id: matrix-imposter-bot
+url: http://localhost:10007
+as_token: abcdefghijklmnopqrstuvwxyz
+hs_token: qwertyuiopasdfghjklzxcvbnm
+sender_localpart: imposter-bot
+namespaces:
+    users: []
+    aliases: []
+rate_limited: false
