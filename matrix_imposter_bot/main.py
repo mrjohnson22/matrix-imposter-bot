@@ -596,10 +596,12 @@ def transactions(txnId):
                         elif in_control_room:
                             if member == config.as_botname:
                                 # TODO non-blocking
-                                # TODO maybe don't send messages into this room until the user joins
+                                # TODO Maybe don't send messages into this room until the user joins.
+                                #      For now just don't auto-run "actions" because joins will be shown
                                 event_success = \
-                                        post_message_status(room_id, messages.welcome()) and \
-                                        cmd_show_actions(None, get_control_room_user(room_id), room_id)
+                                        post_message_status(room_id, messages.welcome())
+                                        #post_message_status(room_id, messages.welcome()) and \
+                                        #cmd_show_actions(None, get_control_room_user(room_id), room_id)
                             else:
                                 # If someone other than the control room's user joined it,
                                 # send them a violation message.

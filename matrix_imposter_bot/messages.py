@@ -6,7 +6,7 @@ def get_room_fmt_pair(template, room_id, room_name, *args):
     return (plain, html)
 
 def welcome():
-    return 'Hi! I\'m imposter-bot. Send me commands in this room.'
+    return 'Hi! I\'m imposter-bot. Send me commands in this room.\nTry saying "actions" to see a list of everything you can make me do.'
 
 def ping():
     return 'You called?'
