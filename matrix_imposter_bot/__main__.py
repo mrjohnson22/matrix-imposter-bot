@@ -40,7 +40,7 @@ sys.argv = sys.argv[:1] + args_for_rerun
 
 def initial_setup():
     # TODO non-blocking and error checking
-    r = mx_request('GET', '/_matrix/client/r0/profile/{}/avatar_url'.format(config.as_botname))
+    r = mx_request('GET', '/_matrix/client/r0/profile/{}/displayname'.format(config.as_botname))
     if r.status_code == 404:
         r = mx_request('POST', '/_matrix/client/r0/register',
             json={
@@ -53,14 +53,16 @@ def initial_setup():
         else:
             return
 
-    elif r.status_code != 200 or utils.get_from_dict(r.json(), 'avatar_url') != config.as_avatar:
-        mx_request('PUT', '/_matrix/client/r0/profile/{}/avatar_url'.format(config.as_botname),
-            json={'avatar_url': config.as_avatar})
-
-    r = mx_request('GET', '/_matrix/client/r0/profile/{}/displayname'.format(config.as_botname))
-    if r.status_code != 200 or utils.get_from_dict(r.json(), 'avatar_url') != config.as_disname:
+    elif r.status_code != 200 or utils.get_from_dict(r.json(), 'displayname') != config.as_disname:
         mx_request('PUT', '/_matrix/client/r0/profile/{}/displayname'.format(config.as_botname),
             json={'displayname': config.as_disname})
+
+    if config.as_avatar == '':
+        return
+    r = mx_request('GET', '/_matrix/client/r0/profile/{}/avatar_url'.format(config.as_botname))
+    if r.status_code != 200 or utils.get_from_dict(r.json(), 'avatar_url') != config.as_avatar:
+        mx_request('PUT', '/_matrix/client/r0/profile/{}/avatar_url'.format(config.as_botname),
+            json={'avatar_url': config.as_avatar})
 
 initial_setup()
 
@@ -72,7 +74,7 @@ from threading import Timer
 def update_presence():
     mx_request('PUT', '/_matrix/client/r0/presence/{}/status'.format(config.as_botname),
         json={'presence': 'online'})
-    t = Timer(30.0, update_presence)
+    t = Timer(60.0, update_presence)
     t.start()
 
 update_presence()

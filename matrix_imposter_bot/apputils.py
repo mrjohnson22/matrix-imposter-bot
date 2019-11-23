@@ -41,14 +41,14 @@ def mx_request(method, endpoint, json=None, access_token=None, **kwargs):
 
 
 def get_room_name(room_id):
-    r = mx_request('GET', '/_matrix/client/r0/rooms/{}/state/m.room.name'.format(room_id))
+    r = mx_request('GET', f'/_matrix/client/r0/rooms/{room_id}/state/m.room.name')
     if r.status_code == 200:
         return r.json()['name']
-    elif r.status_code == 403:
-        r = mx_request('GET', '/_matrix/client/r0/rooms/{}/state/m.room.canonical_alias'.format(room_id))
+    elif r.status_code == 404:
+        r = mx_request('GET', f'/_matrix/client/r0/rooms/{room_id}/state/m.room.canonical_alias')
         if r.status_code == 200:
             return r.json()['alias']
-        elif r.status_code == 403:
+        elif r.status_code == 404:
             return 'Unnamed room'
 
     return None
@@ -60,10 +60,7 @@ def post_message(room_id, message_plain, message_html=None):
         json['format'] = 'org.matrix.custom.html'
         json['formatted_body'] = message_html
 
-    return mx_request('PUT',
-            '/_matrix/client/r0/rooms/{}/send/{}/txnId'.format(
-                room_id, 'm.room.message'),
-            json)
+    return mx_request('PUT', f'/_matrix/client/r0/rooms/{room_id}/send/m.room.message/txnId', json)
 
 def post_message_status(*args, **kwargs):
     return post_message(*args, **kwargs).status_code == 200

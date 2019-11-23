@@ -1,3 +1,5 @@
+config.yaml
+registration.yaml
 .venv
 *.db
 */__pycache__

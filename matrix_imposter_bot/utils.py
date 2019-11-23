@@ -7,6 +7,7 @@ from .config import db_name
 def get_db_conn():
     if 'conn' not in g:
         g.conn = sqlite3.connect(db_name)
+        g.conn.execute('PRAGMA foreign_keys = ON')
 
     return g.conn
 
@@ -36,10 +37,10 @@ def make_request(method, endpoint, json=None, headers=None, **kwargs):
     print('URL: ' + endpoint)
     #if headers != None:
     #    for key in headers:
-    #        print('{}: {}'.format(key, headers[key]))
+    #        print(f'{key}: {headers[key]}')
     if json != None:
         for key in json:
-            print('{}: {}'.format(key, json[key]))
+            print(f'{key}: {json[key]}')
     print('--- END  REQUEST')
 
     r = requests.request(method, endpoint, json=json, headers=headers, **kwargs)
@@ -48,11 +49,11 @@ def make_request(method, endpoint, json=None, headers=None, **kwargs):
     try:
         json = r.json()
         for key in json:
-            print('{}: {}'.format(key, json[key]))
+            print(f'{key}: {json[key]}')
     except:
         print(r.text)
 
-    print('STATUS: {}'.format(r.status_code))
+    print(f'STATUS: {r.status_code}')
     #print(r.headers.items())
     print('--- END  RESPONSE')
 

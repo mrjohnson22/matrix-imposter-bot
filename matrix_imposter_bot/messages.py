@@ -11,6 +11,12 @@ def welcome():
 def ping():
     return 'You called?'
 
+def already_controlled():
+    return 'You invited me to a direct chat room, but we already have this room, and I can only be in one direct chat at a time!'
+
+def invalid_control_room_user(bad_mxid, good_mxid):
+    return 'Hey {}, you aren\'t allowed in here! This is {}\'s control room!'.format(bad_mxid, good_mxid)
+
 def invalid_command():
     return 'Not a valid command!'
 
@@ -20,7 +26,7 @@ def ask_for_token():
     return 'You can give me your token by saying "token <your-token-here>".'
 
 def offer_mimic():
-    return 'Reply "mimicMe" to this message to make me post other people\'s messages on your behalf in this room.'
+    return 'Reply "mimicMe" to this message to make me post other people\'s messages on your behalf in that room.'
 
 def offer_victim(mxid):
     return 'If you want me to make {0} send replicas of your messages, reply "echoMe" to this message.\nIf you want me to replace your messages with ones sent by {0}, reply "replaceMe" instead.'.format(mxid)
@@ -56,7 +62,7 @@ def invalid_token():
     return 'Invalid access token!!'
 
 def revoked_token():
-    return 'OK, I discarded the access token you gave me.'
+    return 'OK, I discarded the access token you gave me. If I was mimicking you anywhere, I won\'t anymore.'
 
 def no_revoke_token():
     return 'You never gave me a token to revoke!'
@@ -96,6 +102,18 @@ def stopped_victim(room_id, room_name):
 
 def missed_listen(room_id, room_name):
     return get_room_fmt_pair('I was never listening to you in {}!', room_id, room_name)
+
+def mimic_none_available():
+    return 'There are no rooms where I can mimic you in!'
+
+def victim_none_available():
+    return 'There are no rooms where I can echo you or replace your messages in!'
+
+def mimic_available():
+    return 'I can mimic you in the following rooms. Reply "mimicMe" to the room you mimic you in.'
+
+def victim_available():
+    return 'I can echo you or replace your messages in the following rooms. Reply "echoMe" or "replaceMe" to the room you want me to echo/replace you in.'
 
 def mimic_none():
     return 'I am not mimicking you in any rooms!'
