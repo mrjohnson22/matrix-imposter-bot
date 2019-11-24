@@ -17,7 +17,7 @@ def commit_txnId(txnId):
     # Not actually committing here, relying on HS to no-op re-requests
 
 
-def mx_request(method, endpoint, json=None, access_token=None, **kwargs):
+def mx_request(method, endpoint, json=None, access_token=None, verbose=True, **kwargs):
     headers = {
         'Content-Type':'application/json',
         'Authorization':'Bearer {}'.format(
@@ -31,7 +31,7 @@ def mx_request(method, endpoint, json=None, access_token=None, **kwargs):
             txnId = get_next_txnId()
             endpoint = endpoint[:slash_index] + str(txnId)
 
-    r = utils.make_request(method, config.hs_address + endpoint, json, headers, **kwargs)
+    r = utils.make_request(method, config.hs_address + endpoint, json, headers, verbose, **kwargs)
 
     # TODO handle failure
     if txnId != None and r.status_code == 200:

@@ -73,8 +73,8 @@ initial_setup()
 from threading import Timer
 def update_presence():
     mx_request('PUT', '/_matrix/client/r0/presence/{}/status'.format(config.as_botname),
-        json={'presence': 'online'})
-    t = Timer(60.0, update_presence)
+        json={'presence': 'online'}, verbose=False)
+    t = Timer(20.0, update_presence)
     t.start()
 
 update_presence()

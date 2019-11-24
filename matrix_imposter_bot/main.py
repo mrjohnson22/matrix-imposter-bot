@@ -769,4 +769,8 @@ def transactions(txnId):
             # Discard any uncommitted changes
             utils.close_db_conn()
 
+    if txn_success and len(events) > 0:
+        # TODO non-blocking
+        mx_request('POST', f'/_matrix/client/r0/rooms/{room_id}/receipt/m.read/{events[-1]["event_id"]}')
+
     return ({}, 200 if txn_success else 500)

@@ -31,30 +31,32 @@ def fetchone_single(c):
     seq = c.fetchone()
     return seq[0] if seq else None
 
-def make_request(method, endpoint, json=None, headers=None, **kwargs):
-    print('\n---BEGIN REQUEST')
-    print('Method: ' + method)
-    print('URL: ' + endpoint)
-    #if headers != None:
-    #    for key in headers:
-    #        print(f'{key}: {headers[key]}')
-    if json != None:
-        for key in json:
-            print(f'{key}: {json[key]}')
-    print('--- END  REQUEST')
+def make_request(method, endpoint, json=None, headers=None, verbose=True, **kwargs):
+    if verbose:
+        print('\n---BEGIN REQUEST')
+        print('Method: ' + method)
+        print('URL: ' + endpoint)
+        #if headers != None:
+        #    for key in headers:
+        #        print(f'{key}: {headers[key]}')
+        if json != None:
+            for key in json:
+                print(f'{key}: {json[key]}')
+        print('--- END  REQUEST')
 
     r = requests.request(method, endpoint, json=json, headers=headers, **kwargs)
 
-    print('\n---BEGIN RESPONSE')
-    try:
-        json = r.json()
-        for key in json:
-            print(f'{key}: {json[key]}')
-    except:
-        print(r.text)
+    if verbose:
+        print('\n---BEGIN RESPONSE')
+        try:
+            json = r.json()
+            for key in json:
+                print(f'{key}: {json[key]}')
+        except:
+            print(r.text)
 
-    print(f'STATUS: {r.status_code}')
-    #print(r.headers.items())
-    print('--- END  RESPONSE')
+        print(f'STATUS: {r.status_code}')
+        #print(r.headers.items())
+        print('--- END  RESPONSE')
 
     return r
