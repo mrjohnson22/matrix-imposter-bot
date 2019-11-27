@@ -29,7 +29,7 @@ for arg in sys.argv[1:]:
     elif arg == '--skip':
         skip = True
     else:
-        print('Invalid argument: {}'.format(arg))
+        print(f'Invalid argument: {arg}')
         sys.exit(-1)
 
 if not skip_db_prep:
@@ -40,7 +40,7 @@ sys.argv = sys.argv[:1] + args_for_rerun
 
 def initial_setup():
     # TODO non-blocking and error checking
-    r = mx_request('GET', '/_matrix/client/r0/profile/{}/displayname'.format(config.as_botname))
+    r = mx_request('GET', f'/_matrix/client/r0/profile/{config.as_botname}/displayname')
     if r.status_code == 404:
         r = mx_request('POST', '/_matrix/client/r0/register',
             json={
@@ -54,14 +54,14 @@ def initial_setup():
             return
 
     elif r.status_code != 200 or utils.get_from_dict(r.json(), 'displayname') != config.as_disname:
-        mx_request('PUT', '/_matrix/client/r0/profile/{}/displayname'.format(config.as_botname),
+        mx_request('PUT', f'/_matrix/client/r0/profile/{config.as_botname}/displayname',
             json={'displayname': config.as_disname})
 
     if config.as_avatar == '':
         return
-    r = mx_request('GET', '/_matrix/client/r0/profile/{}/avatar_url'.format(config.as_botname))
+    r = mx_request('GET', f'/_matrix/client/r0/profile/{config.as_botname}/avatar_url')
     if r.status_code != 200 or utils.get_from_dict(r.json(), 'avatar_url') != config.as_avatar:
-        mx_request('PUT', '/_matrix/client/r0/profile/{}/avatar_url'.format(config.as_botname),
+        mx_request('PUT', f'/_matrix/client/r0/profile/{config.as_botname}/avatar_url',
             json={'avatar_url': config.as_avatar})
 
 initial_setup()
@@ -72,7 +72,7 @@ initial_setup()
 # TODO use an event loop instead
 from threading import Timer
 def update_presence():
-    mx_request('PUT', '/_matrix/client/r0/presence/{}/status'.format(config.as_botname),
+    mx_request('PUT', f'/_matrix/client/r0/presence/{config.as_botname}/status',
         json={'presence': 'online'}, verbose=False)
     t = Timer(20.0, update_presence)
     t.start()
@@ -87,7 +87,7 @@ app.run(host=config.cfg_settings['appservice']['host'],
 
 def on_exit():
     print('Shutting down')
-    mx_request('PUT', '/_matrix/client/r0/presence/{}/status'.format(config.as_botname),
+    mx_request('PUT', f'/_matrix/client/r0/presence/{config.as_botname}/status',
         json={'presence': 'offline'})
 
 import atexit
