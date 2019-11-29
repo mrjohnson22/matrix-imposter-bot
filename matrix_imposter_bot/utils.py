@@ -1,8 +1,13 @@
-import requests
 import sqlite3
+
 from flask import g
+from requests import request
+from requests.exceptions import ConnectionError
+
+from time import sleep
 
 from .config import db_name
+
 
 def get_db_conn():
     if 'conn' not in g:
@@ -31,7 +36,7 @@ def fetchone_single(c):
     seq = c.fetchone()
     return seq[0] if seq else None
 
-def make_request(method, endpoint, json=None, headers=None, verbose=True, **kwargs):
+def make_request(method, endpoint, json=None, headers=None, verbose=True, wait=False, **kwargs):
     if verbose:
         print('\n---BEGIN REQUEST')
         print('Method: ' + method)
@@ -44,7 +49,14 @@ def make_request(method, endpoint, json=None, headers=None, verbose=True, **kwar
                 print(f'{key}: {json[key]}')
         print('--- END  REQUEST')
 
-    r = requests.request(method, endpoint, json=json, headers=headers, **kwargs)
+    while True:
+        try:
+            r = request(method, endpoint, json=json, headers=headers, **kwargs)
+            break
+        except ConnectionError as e:
+            if verbose:
+                print('Error, try again in 5 seconds...')
+                sleep(5)
 
     if verbose:
         print('\n---BEGIN RESPONSE')
