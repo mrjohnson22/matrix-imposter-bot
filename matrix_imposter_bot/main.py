@@ -104,7 +104,7 @@ def get_mimic_user(target_room):
     return utils.fetchone_single(
         utils.get_db_conn().execute('SELECT mxid FROM mimic_rules WHERE room_id=?', (target_room,)))
 
-def get_in_control_room(room_id):
+def is_in_control_room(room_id):
     return utils.fetchone_single(
         utils.get_db_conn().execute('SELECT is_control FROM rooms WHERE room_id=?', (room_id,)))
 
@@ -520,6 +520,7 @@ def transactions(txnId):
 
     committed_event_idxs = get_committed_txn_event_idxs(txnId)
     events = request.get_json()['events']
+    seen_event_ids = {}
     for i in range(len(events)):
 
         if len(committed_event_idxs) > 0 and i == committed_event_idxs[0]:
@@ -530,6 +531,9 @@ def transactions(txnId):
         event_success = True
 
         event = events[i]
+        event_id = event['event_id']
+        seen_event_id = event_id
+        room_id = event.get('room_id')
         content = event['content']
         type = event['type']
 
@@ -543,7 +547,6 @@ def transactions(txnId):
         if type.find('m.room') == 0:
             stype = type[7:]
             sender = event['sender']
-            room_id = event['room_id']
 
             c = utils.get_db_conn().cursor()
 
@@ -587,7 +590,7 @@ def transactions(txnId):
                         pass
 
                     else:
-                        in_control_room = get_in_control_room(room_id)
+                        in_control_room = is_in_control_room(room_id)
                         if in_control_room == None:
                             # Only possibility is that the bot somehow joined a room it didn't know about.
                             # Just leave.
@@ -635,7 +638,7 @@ def transactions(txnId):
                                     notify_user_joined)
 
                 elif membership == 'leave':
-                    in_control_room = get_in_control_room(room_id)
+                    in_control_room = is_in_control_room(room_id)
                     control_room_user = get_control_room_user(room_id) if in_control_room else None
                     if in_control_room == None:
                         # Someone left an unmonitored room.
@@ -696,7 +699,7 @@ def transactions(txnId):
                 if 'body' not in content:
                     # Event is redacted, ignore
                     pass
-                elif get_in_control_room(room_id):
+                elif is_in_control_room(room_id):
                     if sender == get_control_room_user(room_id):
                         replied_event = None
                         try:
@@ -722,7 +725,7 @@ def transactions(txnId):
 
                     else:
                         access_token = None
-                        c.execute('SELECT * FROM generated_messages WHERE event_id=? AND room_id=?', (event['event_id'], room_id))
+                        c.execute('SELECT * FROM generated_messages WHERE event_id=? AND room_id=?', (event_id, room_id))
                         if c.fetchone() == None:
                             c.execute('SELECT access_token, mxid, replace FROM victim_rules NATURAL JOIN mimic_rules NATURAL JOIN user_access_tokens WHERE victim_id=? AND room_id=?', (sender, room_id))
                             row = c.fetchone()
@@ -740,13 +743,16 @@ def transactions(txnId):
                                     access_token=access_token)
 
                             if r.status_code == 200:
-                                c.execute('INSERT INTO generated_messages VALUES (?, ?)', (r.json()['event_id'], room_id))
+                                seen_event_id = r.json()['event_id']
+                                c.execute('INSERT INTO generated_messages VALUES (?, ?)', (seen_event_id, room_id))
                                 if replace:
                                     r = mx_request('PUT',
-                                        f'/_matrix/client/r0/rooms/{room_id}/redact/{event["event_id"]}/txnId',
+                                        f'/_matrix/client/r0/rooms/{room_id}/redact/{event_id}/txnId',
                                         json={'reason':'Replaced by ImposterBot'})
                                     if r.status_code not in [200, 403, 404]:
                                         event_success = False
+                                    elif r.status_code == 200:
+                                        seen_event_id = r.json()['event_id']
 
                             elif r.json()['errcode'] == 'M_UNKNOWN_TOKEN':
                                 event_success = control_room_notify(
@@ -762,6 +768,8 @@ def transactions(txnId):
             print(f'Unsupported event type: {type}')
 
         if event_success:
+            if room_id != None and not is_in_control_room(room_id):
+                seen_event_ids[room_id] = seen_event_id
             commit_txn_event(txnId, i)
         else:
             print('\nEvent unsuccessful!!!!!')
@@ -769,8 +777,8 @@ def transactions(txnId):
             # Discard any uncommitted changes
             utils.close_db_conn()
 
-    if txn_success and len(events) > 0:
+    for room_id, event_id in seen_event_ids.items():
         # TODO non-blocking
-        mx_request('POST', f'/_matrix/client/r0/rooms/{room_id}/receipt/m.read/{events[-1]["event_id"]}')
+        mx_request('POST', f'/_matrix/client/r0/rooms/{room_id}/receipt/m.read/{event_id}')
 
     return ({}, 200 if txn_success else 500)
