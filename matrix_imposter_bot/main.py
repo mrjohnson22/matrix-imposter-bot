@@ -7,7 +7,7 @@ from . import app
 from . import config
 from . import messages
 from . import utils
-from .apputils import mx_request, post_message, post_message_status, get_room_name
+from .apputils import mx_request, post_message, post_message_status, MxRoomLink, MxUserLink
 
 
 @app.teardown_appcontext
@@ -114,26 +114,26 @@ def get_control_room_user(room_id):
         utils.get_db_conn().execute('SELECT mxid FROM rooms NATURAL JOIN control_rooms WHERE rooms.is_control=1 AND room_id=?', (room_id,)))
 
 
-def control_room_notify(user_to, target_room, notify_fn, *args):
+def control_room_notify(user_to, target_room_info, notify_fn, *args):
     control_room = find_existing_control_room(user_to)
     if control_room == None:
         return True
 
-    if target_room != control_room:
+    if target_room_info.id != control_room:
         # TODO non-blocking
-        return command_notify(control_room, target_room, True, notify_fn, *args)
+        return command_notify(control_room, target_room_info, True, notify_fn, *args)
     else:
         return True
 
-def command_notify(control_room, target_room, set_latest, notify_fn, *args):
+def command_notify(control_room, target_room_info, set_latest, notify_fn, *args):
     # Use this when the control room is known & a reply link is needed
-    r, reply_link = notify_fn(control_room, target_room, *args)
+    r, reply_link = notify_fn(control_room, target_room_info, *args)
     if r != None and r.status_code == 200:
         if reply_link:
             event_id = r.json()['event_id']
             c = utils.get_db_conn().cursor()
             c.execute('INSERT INTO reply_links VALUES (?, ?, ?)',
-                (control_room, event_id, target_room))
+                (control_room, event_id, target_room_info.id))
             if set_latest:
                 c.execute('INSERT INTO latest_reply_link VALUES (?, ?)',
                     (control_room, event_id))
@@ -141,57 +141,52 @@ def command_notify(control_room, target_room, set_latest, notify_fn, *args):
     else:
         return False
 
-def notify_bot_joined(control_room, target_room, room_name):
-    # Pass room_name to this since it's called in a loop
+def notify_bot_joined(control_room, target_room_info):
     return post_message(control_room,
-        *messages.bot_joined(target_room, room_name)), True
+        *messages.bot_joined(target_room_info)), True
 
-def notify_user_joined(control_room, target_room):
-    room_name = get_room_name(target_room)
-    if room_name == None:
-        return None, False
-    else:
-        return post_message(control_room,
-            *messages.user_joined(target_room, room_name, get_mimic_user(target_room))), True
-
-def notify_bot_left(control_room, target_room, room_name):
-    # Pass room_name to this since it's called in a loop
+def notify_user_joined(control_room, target_room_info):
+    mimic_user = get_mimic_user(target_room_info.id)
     return post_message(control_room,
-        *messages.bot_left(target_room, room_name)), False
+        *messages.user_joined(target_room_info, MxUserLink(mimic_user))), True
 
-def notify_user_left(control_room, target_room):
-    room_name = get_room_name(target_room)
-    if room_name == None:
-        return None, False
-    else:
-        return post_message(control_room,
-            *messages.user_left(target_room, room_name)), False
-
-def notify_accepted_mimic(control_room, target_room, room_name):
+def notify_bot_left(control_room, target_room_info):
     return post_message(control_room,
-        *messages.accepted_mimic(target_room, room_name)), True
+        *messages.bot_left(target_room_info)), False
 
-def notify_mimic_taken(control_room, target_room, mxid, room_name):
+def notify_user_left(control_room, target_room_info):
     return post_message(control_room,
-        *messages.mimic_taken(mxid, target_room, room_name)), True
+        *messages.user_left(target_room_info)), False
 
-def notify_mimic_user_left(control_room, target_room, mxid, room_name):
+def notify_accepted_mimic(control_room, target_room_info):
     return post_message(control_room,
-        *messages.mimic_user_left(mxid, target_room, room_name)), True
+        *messages.accepted_mimic(target_room_info)), True
 
-def notify_accepted_echo(control_room, target_room, room_name):
+def notify_mimic_taken(control_room, target_room_info, mimic_user_info):
     return post_message(control_room,
-        *messages.accepted_echo(target_room, room_name)), True
+        *messages.mimic_taken(target_room_info, mimic_user_info)), True
 
-def notify_accepted_replace(control_room, target_room, room_name):
+def notify_mimic_user_left(control_room, target_room_info, mimic_user_info):
     return post_message(control_room,
-        *messages.accepted_replace(target_room, room_name)), True
+        *messages.mimic_user_left(target_room_info, mimic_user_info)), True
 
-def notify_room_name(control_room, target_room, room_name):
+def notify_accepted_echo(control_room, target_room_info):
     return post_message(control_room,
-        *messages.room(target_room, room_name)), True
+        *messages.accepted_echo(target_room_info)), True
 
-def notify_expired_token(control_room, target_room):
+def notify_accepted_replace(control_room, target_room_info):
+    return post_message(control_room,
+        *messages.accepted_replace(target_room_info)), True
+
+def notify_room_name(control_room, target_room_info):
+    return post_message(control_room,
+        *messages.room_name(target_room_info)), True
+
+def notify_room_name_and_mimic_user(control_room, target_room_info, mimic_user_info):
+    return post_message(control_room,
+        *messages.room_name_and_mimic_user(target_room_info, mimic_user_info)), True
+
+def notify_expired_token(control_room, target_room_info):
     return post_message(control_room, messages.expired_token()), False
 
 
@@ -205,7 +200,7 @@ def run_command(command, sender, control_room, replied_event=None):
         return post_message_status(control_room, messages.invalid_command())
 
     command_args = command[1:]
-    is_room_command = len(signature(command_func).parameters) == 5
+    is_room_command = len(signature(command_func).parameters) == 4
 
     if not is_room_command:
         return command_func(command_args, sender, control_room)
@@ -231,11 +226,10 @@ def run_command(command, sender, control_room, replied_event=None):
 
             target_room = utils.fetchone_single(c)
 
-        room_name = get_room_name(target_room) if target_room != None else None
-        if room_name == None:
+        if target_room == None:
             return post_message_status(control_room, messages.no_room())
         else:
-            return command_func(command_args, sender, control_room, target_room, room_name)
+            return command_func(command_args, sender, control_room, MxRoomLink(target_room))
 
 
 def cmd_register_token(command_args, sender, control_room):
@@ -260,71 +254,73 @@ def cmd_revoke_token(command_args, sender, control_room):
     return post_message_status(control_room,
         messages.revoked_token() if c.rowcount == 1 else messages.no_revoke_token())
 
-def cmd_set_mimic_user(command_args, sender, control_room, target_room, room_name):
+def cmd_set_mimic_user(command_args, sender, control_room, target_room_info):
     c = utils.get_db_conn().cursor()
     if utils.fetchone_single(c.execute('SELECT access_token FROM user_access_tokens WHERE mxid=?', (sender,))) == None:
         return post_message_status(control_room, messages.cant_mimic())
     else:
-        mimic_user = get_mimic_user(target_room)
+        mimic_user = get_mimic_user(target_room_info.id)
         if mimic_user == sender:
-            return post_message_status(control_room, *messages.already_mimic(target_room, room_name))
+            return post_message_status(control_room, *messages.already_mimic(target_room_info))
         elif mimic_user != None:
-            return post_message_status(control_room, *messages.rejected_mimic(mimic_user, target_room, room_name))
+            return post_message_status(control_room, *messages.rejected_mimic(target_room_info, MxUserLink(mimic_user)))
         else:
-            c.execute('INSERT INTO mimic_rules VALUES (?, ?)', (sender, target_room))
+            c.execute('INSERT INTO mimic_rules VALUES (?, ?)', (sender, target_room_info.id))
             event_success = command_notify(
-                control_room, target_room, True,
-                notify_accepted_mimic, room_name)
+                control_room, target_room_info, True,
+                notify_accepted_mimic)
 
             # Notify other users that they can be victims
-            room_users = get_listening_room_users(target_room, [config.as_botname, sender])
-            if room_users != None:
+            room_users = get_listening_room_users(target_room_info.id, [config.as_botname, sender])
+            if room_users != None and len(room_users) > 0:
+                sender_info = MxUserLink(sender)
                 for room_member in room_users:
                     event_success = control_room_notify(
-                        room_member, target_room,
-                        notify_mimic_taken, sender, room_name) and event_success
-            else:
+                        room_member, target_room_info,
+                        notify_mimic_taken, sender_info) and event_success
+            elif room_users == None:
                 event_success = False
 
             return event_success
 
-def cmd_set_echo_user(command_args, sender, control_room, target_room, room_name):
-    return set_victim_user(sender, control_room, target_room, room_name, False)
+def cmd_set_echo_user(command_args, sender, control_room, target_room_info):
+    return set_victim_user(sender, control_room, target_room_info, False)
 
-def cmd_set_replace_user(command_args, sender, control_room, target_room, room_name):
-    return set_victim_user(sender, control_room, target_room, room_name, True)
+def cmd_set_replace_user(command_args, sender, control_room, target_room_info):
+    return set_victim_user(sender, control_room, target_room_info, True)
 
-def set_victim_user(sender, control_room, target_room, room_name, replace):
-    mimic_user = get_mimic_user(target_room)
+def set_victim_user(sender, control_room, target_room_info, replace):
+    mimic_user = get_mimic_user(target_room_info.id)
     if mimic_user == None:
-        return post_message_status(control_room, *messages.cannot_victimize(target_room, room_name))
+        return post_message_status(control_room, *messages.cannot_victimize(target_room_info))
     elif mimic_user == sender:
-        return post_message_status(control_room, *messages.cannot_victimize_yourself(target_room, room_name))
+        return post_message_status(control_room, *messages.cannot_victimize_yourself(target_room_info))
     else:
-        utils.get_db_conn().execute('INSERT INTO victim_rules VALUES (?, ?, ?)', (sender, target_room, replace))
+        utils.get_db_conn().execute('INSERT INTO victim_rules VALUES (?, ?, ?)', (sender, target_room_info.id, replace))
         return command_notify(
-            control_room, target_room, True,
-            notify_accepted_echo if not replace else notify_accepted_replace, room_name)
+            control_room, target_room_info, True,
+            notify_accepted_echo if not replace else notify_accepted_replace)
 
-def cmd_unset_user(command_args, sender, control_room, target_room, room_name):
+def cmd_unset_user(command_args, sender, control_room, target_room_info):
     c = utils.get_db_conn().cursor()
-    c.execute('DELETE FROM mimic_rules WHERE mxid=? AND room_id=?', (sender, target_room))
+    c.execute('DELETE FROM mimic_rules WHERE mxid=? AND room_id=?', (sender, target_room_info.id))
     if c.rowcount == 0:
         # Wasn't mimicking, were they a victim?
-        c.execute('DELETE FROM victim_rules WHERE victim_id=? AND room_id=?', (sender, target_room))
+        c.execute('DELETE FROM victim_rules WHERE victim_id=? AND room_id=?', (sender, target_room_info.id))
         return post_message_status(control_room,
-            *(messages.stopped_victim(target_room, room_name) if c.rowcount == 1 else messages.missed_listen(target_room, room_name)))
+            *(messages.stopped_victim(target_room_info) if c.rowcount == 1 else messages.missed_listen(target_room_info)))
     else:
-        event_success = post_message_status(control_room, *messages.stopped_mimic(target_room, room_name))
+        event_success = post_message_status(control_room, *messages.stopped_mimic(target_room_info))
 
         # Notify other users that they can be mimic targets
-        room_users = get_listening_room_users(target_room, [config.as_botname, sender])
-        if room_users != None:
+        room_users = get_listening_room_users(target_room_info.id, [config.as_botname, sender])
+        if room_users != None and len(room_users) > 0:
+            sender_info = MxUserLink(sender)
             for room_member in room_users:
                 event_success = control_room_notify(
-                    room_member, target_room,
-                    notify_mimic_user_left, sender, room_name) and event_success
-        else:
+                    room_member, target_room_info,
+                    notify_mimic_user_left, sender_info) and event_success
+        elif room_users == None:
             event_success = False
 
         return event_success
@@ -337,26 +333,17 @@ def cmd_show_status(command_args, sender, control_room):
     mimic_room_infos = []
     for row in c.execute('SELECT room_id FROM mimic_rules WHERE mxid=?', (sender,)):
         room_id = row[0]
-        room_name = get_room_name(room_id)
-        if room_name == None:
-            return False
-        mimic_room_infos.append((room_id, room_name))
+        mimic_room_infos.append(MxRoomLink(room_id))
 
     echo_room_infos = []
-    for row in c.execute('SELECT room_id FROM victim_rules WHERE victim_id=? AND replace=0', (sender,)):
-        room_id = row[0]
-        room_name = get_room_name(room_id)
-        if room_name == None:
-            return False
-        echo_room_infos.append((room_id, room_name))
+    for row in c.execute('SELECT room_id, mxid FROM victim_rules NATURAL JOIN mimic_rules WHERE victim_id=? AND replace=0', (sender,)):
+        room_id, mxid = row
+        echo_room_infos.append((MxRoomLink(room_id), MxUserLink(mxid)))
 
     replace_room_infos = []
-    for row in c.execute('SELECT room_id FROM victim_rules WHERE victim_id=? AND replace=1', (sender,)):
-        room_id = row[0]
-        room_name = get_room_name(room_id)
-        if room_name == None:
-            return False
-        replace_room_infos.append((room_id, room_name))
+    for row in c.execute('SELECT room_id, mxid FROM victim_rules NATURAL JOIN mimic_rules WHERE victim_id=? AND replace=1', (sender,)):
+        room_id, mxid = row
+        replace_room_infos.append((MxRoomLink(room_id), MxUserLink(mxid)))
 
     if len(mimic_room_infos) == 0:
         if not post_message_status(control_room, messages.mimic_none()):
@@ -364,8 +351,8 @@ def cmd_show_status(command_args, sender, control_room):
     else:
         if not post_message_status(control_room, messages.mimic_status()):
             return False
-        for target_room, room_name in mimic_room_infos:
-            if not command_notify(control_room, target_room, False, notify_room_name, room_name):
+        for target_room_info in mimic_room_infos:
+            if not command_notify(control_room, target_room_info, False, notify_room_name):
                 return False
 
     if len(echo_room_infos) == 0:
@@ -374,8 +361,8 @@ def cmd_show_status(command_args, sender, control_room):
     else:
         if not post_message_status(control_room, messages.echo_status()):
             return False
-        for target_room, room_name in echo_room_infos:
-            if not command_notify(control_room, target_room, False, notify_room_name, room_name):
+        for target_room_info, user_info in echo_room_infos:
+            if not command_notify(control_room, target_room_info, False, notify_room_name_and_mimic_user, user_info):
                 return False
 
     if len(replace_room_infos) == 0:
@@ -384,8 +371,8 @@ def cmd_show_status(command_args, sender, control_room):
     else:
         if not post_message_status(control_room, messages.replace_status()):
             return False
-        for target_room, room_name in replace_room_infos:
-            if not command_notify(control_room, target_room, False, notify_room_name, room_name):
+        for target_room_info, user_info in replace_room_infos:
+            if not command_notify(control_room, target_room_info, False, notify_room_name_and_mimic_user, user_info):
                 return False
 
     return True
@@ -412,23 +399,17 @@ def cmd_show_actions(command_args, sender, control_room):
          ' AND room_id NOT IN (SELECT room_id FROM mimic_rules)'),
             sender_rooms):
         room_id = row[0]
-        room_name = get_room_name(room_id)
-        if room_name == None:
-            return False
-        mimic_room_infos.append((room_id, room_name))
+        mimic_room_infos.append(MxRoomLink(room_id))
 
     victim_room_infos = []
     for row in c.execute((
-        'SELECT room_id FROM rooms WHERE is_control=0'
+        'SELECT room_id, mxid FROM rooms NATURAL JOIN mimic_rules WHERE is_control=0'
         f' AND room_id IN ({placeholders})'
          ' AND room_id     IN (SELECT room_id FROM  mimic_rules WHERE mxid!=?)'
          ' AND room_id NOT IN (SELECT room_id FROM victim_rules WHERE victim_id=?)'),
             sender_rooms + [sender, sender]):
-        room_id = row[0]
-        room_name = get_room_name(room_id)
-        if room_name == None:
-            return False
-        victim_room_infos.append((room_id, room_name))
+        room_id, mxid = row
+        victim_room_infos.append((MxRoomLink(room_id), MxUserLink(mxid)))
 
     if len(mimic_room_infos) == 0:
         if not post_message_status(control_room, messages.mimic_none_available()):
@@ -436,8 +417,8 @@ def cmd_show_actions(command_args, sender, control_room):
     else:
         if not post_message_status(control_room, messages.mimic_available()):
             return False
-        for target_room, room_name in mimic_room_infos:
-            if not command_notify(control_room, target_room, False, notify_room_name, room_name):
+        for target_room_info in mimic_room_infos:
+            if not command_notify(control_room, target_room_info, False, notify_room_name):
                 return False
 
     if len(victim_room_infos) == 0:
@@ -446,8 +427,8 @@ def cmd_show_actions(command_args, sender, control_room):
     else:
         if not post_message_status(control_room, messages.victim_available()):
             return False
-        for target_room, room_name in victim_room_infos:
-            if not command_notify(control_room, target_room, False, notify_room_name, room_name):
+        for target_room_info, user_info in victim_room_infos:
+            if not command_notify(control_room, target_room_info, False, notify_room_name_and_mimic_user, user_info):
                 return False
 
     return True
@@ -478,15 +459,13 @@ def user_leave_room(member, room_left):
         c.execute('DELETE FROM victim_rules WHERE room_id=?', (room_left,))
         room_users = get_listening_room_users(room_left, [config.as_botname, member])
         if room_users != None:
-            room_name = get_room_name(room_left)
-            if room_name == None:
-                event_success = False
-            else:
-                for room_member in room_users:
-                    # TODO non-blocking? Success gating or not? Do the same for other occurrences of this pattern.
-                    event_success = control_room_notify(
-                        room_member, room_left,
-                        notify_mimic_user_left, member, room_name) and event_success
+            room_left_info = MxRoomLink(room_left)
+            member_info = MxUserLink(member)
+            for room_member in room_users:
+                # TODO non-blocking? Success gating or not? Do the same for other occurrences of this pattern.
+                event_success = control_room_notify(
+                    room_member, room_left_info,
+                    notify_mimic_user_left, member_info) and event_success
         else:
             event_success = False
     else:
@@ -505,7 +484,12 @@ def unmimic_user(mxid):
     return event_success
 
 
-def prepend_with_author(message, author, isHTML):
+def prepend_with_author(message, sender_info, isHTML):
+    if not isHTML:
+        author = sender_info.text
+    else:
+        author = sender_info.link
+
     return '{0} says:{2}{1}'.format(author, message, '\n\n' if not isHTML else '<br><br>')
 
 
@@ -612,7 +596,7 @@ def transactions(txnId):
                                 control_room_user = get_control_room_user(room_id)
                                 if member != control_room_user:
                                     event_success = post_message_status(room_id,
-                                        messages.invalid_control_room_user(member, control_room_user))
+                                        *messages.invalid_control_room_user(member_info, MxUserLink(control_room_user)))
 
                         else:
                             if member == config.as_botname:
@@ -620,21 +604,18 @@ def transactions(txnId):
                                 # A listening user is a user with a control room.
                                 room_users = get_listening_room_users(room_id, [config.as_botname])
                                 if room_users != None:
-                                    room_name = get_room_name(room_id)
-                                    if room_name == None:
-                                        event_success = False
-                                    else:
-                                        for room_member in room_users:
-                                            event_success = control_room_notify(
-                                                room_member, room_id,
-                                                notify_bot_joined, room_name) and event_success
+                                    room_info = MxRoomLink(room_id)
+                                    for room_member in room_users:
+                                        event_success = control_room_notify(
+                                            room_member, room_info,
+                                            notify_bot_joined) and event_success
                                 else:
                                     event_success = False
 
                             else:
                                 # Notify the user that they joined a room that the bot is in.
                                 event_success = control_room_notify(
-                                    member, room_id,
+                                    member, MxRoomLink(room_id),
                                     notify_user_joined)
 
                 elif membership == 'leave':
@@ -654,14 +635,11 @@ def transactions(txnId):
                             # For each listening user in room, say that bot left
                             room_users = get_listening_room_users(room_id, [config.as_botname])
                             if room_users != None:
-                                room_name = get_room_name(room_id)
-                                if room_name == None:
-                                    event_success = False
-                                else:
-                                    for room_member in room_users:
-                                        event_success = control_room_notify(
-                                            room_member, room_id,
-                                            notify_bot_left, room_name) and event_success
+                                room_info = MxRoomLink(room_id)
+                                for room_member in room_users:
+                                    event_success = control_room_notify(
+                                        room_member, room_info,
+                                        notify_bot_left) and event_success
                             else:
                                 event_success = False
 
@@ -677,7 +655,7 @@ def transactions(txnId):
                         else:
                             event_success = user_leave_room(member, room_id)
                             event_success = control_room_notify(
-                                member, room_id,
+                                member, MxRoomLink(room_id),
                                 notify_user_left) and event_success
 
                             # If no one else is in the room, the bot should leave.
@@ -733,9 +711,15 @@ def transactions(txnId):
                                 access_token, mimic_user, replace = row
 
                         if access_token != None:
-                            content['body'] = prepend_with_author(content['body'], sender, False)
-                            if 'formatted_body' in content:
-                                content['formatted_body'] = prepend_with_author(content['formatted_body'], sender, True)
+                            sender_info = MxUserLink(sender)
+
+                            content['body'] = prepend_with_author(
+                                content['body'], sender_info, False)
+
+                            content['formatted_body'] = prepend_with_author(
+                                content['formatted_body' if 'formatted_body' in content else 'body'], sender_info, True)
+
+                            content['format'] = 'org.matrix.custom.html'
 
                             r = mx_request('PUT',
                                     f'/_matrix/client/r0/rooms/{room_id}/send/m.room.message/txnId',
@@ -756,7 +740,7 @@ def transactions(txnId):
 
                             elif r.json()['errcode'] == 'M_UNKNOWN_TOKEN':
                                 event_success = control_room_notify(
-                                    mimic_user, room_id,
+                                    mimic_user, MxRoomLink(room_id),
                                     notify_expired_token)
                             else:
                                 # Unknown token is a "valid" error. For anything else, want to retry
