@@ -1,6 +1,8 @@
 from . import config
 from . import utils
 
+import re
+
 
 class Linkable:
     def __init__(self, link, text):
@@ -71,6 +73,11 @@ def get_link_fmt_pair(template, linkables, *args):
     plain = template.format(*texts, *args)
     html = template.replace('\n', '<br>').format(*links, *args)
     return (plain, html)
+
+
+room_pattern = re.compile('[#!][^:]+:.*')
+def is_room_id(room_id):
+    return bool(room_pattern.fullmatch(room_id))
 
 
 def get_next_txnId():

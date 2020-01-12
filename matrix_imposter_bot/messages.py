@@ -25,15 +25,12 @@ def ask_for_token():
 def offer_mimic():
     return 'Reply "mimicMe" to this message to make me post other people\'s messages on your behalf in that room.'
 
-def offer_victim_template(position):
-    return f'If you want me to make {{{position}}} send replicas of your messages, reply "echoMe" to this message.\nIf you want me to replace your messages with ones sent by {{{position}}}, reply "replaceMe" instead.'
-
 def offer_stop():
     return 'To make me stop, reply "stopit" to this message.'
 
 def mimic_taken(room_info, user_info):
     return get_link_fmt_pair(
-            'I am now mimicking {0} in the following room:\n{1}\n' + offer_victim_template(0),
+            'I am now mimicking {0} in the following room:\n{1}',
             [user_info, room_info])
 
 def cant_mimic():
@@ -44,14 +41,11 @@ def bot_joined(room_info):
 
 def user_joined(room_info, mimic_user_info):
     return get_link_fmt_pair(
-            'You just joined a room that I am present in:\n{0}\n' + (offer_mimic() if not mimic_user_info.id else offer_victim_template(1)),
+            'You just joined a room that I am present in:\n{}\n' + (offer_mimic() if not mimic_user_info.id else 'I am already mimicking {} in this room.'),
             [room_info, mimic_user_info])
 
 def bot_left(room_info):
     return get_link_fmt_pair('I just left this room:\n{}\nMy reign of terror in that room is over. I won\'t alter messages in it anymore.', [room_info])
-
-def user_left(room_info):
-    return get_link_fmt_pair('You just left a room that I was monitoring:\n{}', [room_info])
 
 def mimic_user_left(room_info, mimic_user_info):
     return get_link_fmt_pair('I am no longer mimicking {0} in following room:\n{1}\nNo one\'s messages will appear as coming from them anymore. This means you can now ask me to mimic you in that room if you like!\n{2}', [mimic_user_info, room_info], offer_mimic())
@@ -77,18 +71,6 @@ def no_room():
 def accepted_mimic(room_info):
     return get_link_fmt_pair('I am now mimicking you in {}!\n{}', [room_info], offer_stop())
 
-def accepted_echo(room_info):
-    return get_link_fmt_pair('I am now echoing your messages in {}!\n{}', [room_info], offer_stop())
-
-def accepted_replace(room_info):
-    return get_link_fmt_pair('I am now replacing your messages in {}!\nJust remember that I can only delete messages if I have sufficient administrative privileges in that room. If your messages don\'t get replaced, ask the admin(s) of the room to give me permission to delete messages in that room.\n{}', [room_info], offer_stop())
-
-def cannot_victimize(room_info):
-    return get_link_fmt_pair('I am not mimicking anyone in {}. I can only echo your messages in rooms where I\'m mimicking someone!', [room_info])
-
-def cannot_victimize_yourself(room_info):
-    return get_link_fmt_pair('I am already mimicking you in {}. I can\'t echo and mimic you at the same time!', [room_info])
-
 def rejected_mimic(room_info, user_info):
     return get_link_fmt_pair('I can\'t mimic you in {}, because I am already mimicking {} in that room.', [room_info, user_info])
 
@@ -98,23 +80,50 @@ def already_mimic(room_info):
 def stopped_mimic(room_info):
     return get_link_fmt_pair('Okay, I stopped mimicking you in {}.', [room_info])
 
-def stopped_victim(room_info):
-    return get_link_fmt_pair('Okay, I stopped listening to your messages in {}.', [room_info])
+def never_mimicked(room_info):
+    return get_link_fmt_pair('I was never mimicking you in {}!', [room_info])
 
-def missed_listen(room_info):
-    return get_link_fmt_pair('I was never listening to you in {}!', [room_info])
+def replace_reminder():
+    return ' Don\'t forget to give me a power level high enough to delete messages!'
+
+def set_response_mode(replace):
+    return 'I will now {} people\'s messages.{}'.format('echo' if not replace else 'replace', replace_reminder() if replace else '')
+
+def set_response_mode_in_room(replace, room_info):
+    return get_link_fmt_pair('I will now {1} people\'s messages in {0}, overriding your global preference.{2}', [room_info], 'echo' if not replace else 'replace', replace_reminder() if replace else '')
+
+def same_response_mode(replace):
+    return 'I was already {} people\'s messages!'.format('echoing' if not replace else 'replacing')
+
+def same_response_mode_in_room(replace, room_info):
+    return get_link_fmt_pair('I was already {1} people\'s messages in {0}!', [room_info], 'echoing' if not replace else 'replacing')
+
+def invalid_mode():
+    return 'Valid modes are "echo", "replace", or "default" (only for room-specific modes).'
+
+def default_response_mode_in_room(room_info):
+    return get_link_fmt_pair('I will now follow your global preference for how to handle people\'s messages in {}.{}', [room_info])
+
+def same_default_response_mode_in_room(room_info):
+    return get_link_fmt_pair('I was already following your global preference for how to handle people\'s messages in {}!', [room_info])
+
+def set_blacklist():
+    return 'Global blacklist applied. I will not monitor messages sent by anyone matching the provided pattern.'
+
+def set_blacklist_in_room(room_info):
+    return get_link_fmt_pair('Room-specific blacklist applied in {}. I will not monitor messages sent by anyone matching the provided pattern in that room.', [room_info])
+
+def default_blacklist_in_room(room_info):
+    return get_link_fmt_pair('I will now use your global blacklist for {} instead of a room-specific blacklist.', [room_info])
+
+def same_default_blacklist_in_room(room_info):
+    return get_link_fmt_pair('I was already using your global blacklist for {}!', [room_info])
 
 def mimic_none_available():
     return 'There are no rooms where I can mimic you in!'
 
-def victim_none_available():
-    return 'There are no rooms where I can echo you or replace your messages in!'
-
 def mimic_available():
     return 'I can mimic you in the following rooms. Reply "mimicMe" to the room you mimic you in.'
-
-def victim_available():
-    return 'I can echo you or replace your messages in the following rooms. Reply "echoMe" or "replaceMe" to the room you want me to echo/replace you in.'
 
 def mimic_none():
     return 'I am not mimicking you in any rooms!'

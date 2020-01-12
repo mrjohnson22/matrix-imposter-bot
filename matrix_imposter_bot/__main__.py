@@ -12,7 +12,7 @@ def run_sql(filename):
     conn = sqlite3.connect(config.db_name)
     c = conn.cursor()
     cmds = pkg_resources.resource_string(__name__, 'sql/' + filename).decode('utf8')
-    for cmd in cmds.split(';'):
+    for cmd in cmds.split(';\n\n'):
         c.execute(cmd)
     conn.commit()
     conn.close()
