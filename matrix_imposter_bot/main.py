@@ -696,7 +696,7 @@ def transactions(txnId):
                                 event_success = False
 
                         # NOTE This should trigger a lot of cascaded deletions!
-                        c.execute('DELETE FROM rooms WHERE room_id=?', (room_id,))
+                        c.execute(f'DELETE FROM {"rooms" if not in_control_room else "control_rooms"} WHERE room_id=?', (room_id,))
 
                     else:
                         if in_control_room:
