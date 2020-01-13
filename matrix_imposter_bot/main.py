@@ -612,7 +612,7 @@ def transactions(txnId):
                         else:
                             # Always accept group chat invites.
                             # Since the bot was interacted with, create a control room for the sender.
-                            c.execute('INSERT INTO rooms VALUES (?, 0)', (room_id,))
+                            c.execute('INSERT INTO rooms VALUES (?, NULL)', (room_id,))
                             event_success = find_or_prepare_control_room(sender) != None
 
                         if event_success and not refused:
