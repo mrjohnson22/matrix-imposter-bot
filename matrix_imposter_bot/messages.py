@@ -119,6 +119,12 @@ def default_blacklist_in_room(room_info):
 def same_default_blacklist_in_room(room_info):
     return get_link_fmt_pair('I was already using your global blacklist for {}!', [room_info])
 
+def no_blacklist():
+    return 'No blacklist!'
+
+def blacklist_follows_default(default_blacklist):
+    return f'Following the global blacklist of {default_blacklist}.'
+
 def mimic_none_available():
     return 'There are no rooms where I can mimic you in!'
 

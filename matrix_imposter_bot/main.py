@@ -367,6 +367,21 @@ def cmd_set_blacklist(command_args, sender, control_room, target_room_info):
     else:
         return post_message_status(control_room, *messages.set_blacklist_in_room(target_room_info))
 
+def cmd_get_blacklist(command_args, sender, control_room, target_room_info):
+    query = 'SELECT blacklist FROM blacklists WHERE mimic_user=? AND room_id IS ?'
+    c = utils.get_db_conn().cursor()
+    c.execute(query, (sender, target_room_info.id if target_room_info else None))
+    row = c.fetchone()
+    if target_room_info != None and row == None:
+        c.execute(query, (sender, None))
+        default_blacklist = utils.fetchone_single(c)
+        if default_blacklist == None:
+            default_blacklist = 'no blacklist'
+        return post_message_status(control_room, messages.blacklist_follows_default(default_blacklist))
+    else:
+        blacklist = row[0] if row != None else None
+        return post_message_status(control_room, blacklist if blacklist else messages.no_blacklist())
+
 def cmd_show_status(command_args, sender, control_room):
 #    c = utils.get_db_conn().cursor()
 #    # Don't quick-reply to anything
@@ -470,6 +485,7 @@ COMMANDS = {
     'stopit':       Command(cmd_unset_user, True),
     'setmode':      Command(cmd_set_mode),
     'blacklist':    Command(cmd_set_blacklist),
+    'getblacklist': Command(cmd_get_blacklist),
 #   'status':       Command(cmd_show_status),
     'actions':      Command(cmd_show_actions)
 }
