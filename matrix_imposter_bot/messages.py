@@ -66,7 +66,7 @@ def expired_token():
     return 'The token I have for your account is invalid. I can\'t mimic you until you give me a new, valid access token.\n' + ask_for_token()
 
 def no_room():
-    return 'I can only answer that command in response to a room that I am present in!'
+    return 'I can only answer that command in response to a room that we are both present in!'
 
 def accepted_mimic(room_info):
     return get_link_fmt_pair('I am now mimicking you in {}!\n{}', [room_info], offer_stop())

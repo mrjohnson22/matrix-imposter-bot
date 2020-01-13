@@ -214,7 +214,9 @@ def run_command(command_text, sender, control_room, replied_event=None):
 
             target_room = utils.fetchone_single(c)
 
-        return command.func(command_args, sender, control_room, MxRoomLink(target_room) if target_room else None)
+        return command.func(
+            command_args, sender, control_room,
+            MxRoomLink(target_room) if target_room and is_bot_in_room(target_room) else None)
 
 
 def cmd_register_token(command_args, sender, control_room):
@@ -500,6 +502,10 @@ COMMANDS = {
 def bot_leave_room(room_id):
     r = mx_request('POST', f'/_matrix/client/r0/rooms/{room_id}/leave')
     return r.status_code == 200
+
+def is_bot_in_room(room_id):
+    r = mx_request('GET', '/_matrix/client/r0/joined_rooms')
+    return room_id in r.json()['joined_rooms'] if r.status_code == 200 else False
 
 def user_leave_room(member, room_left):
     event_success = True
