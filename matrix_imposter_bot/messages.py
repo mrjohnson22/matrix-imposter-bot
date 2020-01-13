@@ -3,7 +3,7 @@ from .apputils import get_link_fmt_pair
 # TODO translations???
 
 def welcome():
-    return 'Hi! I\'m imposter-bot. Send me commands in this room.\nTry saying "actions" to see a list of everything you can make me do.'
+    return 'Hi! I\'m imposter-bot. Send me commands in this room.\nTo get started, give me your access token by saying "token <your-token-here>".'
 
 def ping():
     return 'You called?'
@@ -51,7 +51,7 @@ def mimic_user_left(room_info, mimic_user_info):
     return get_link_fmt_pair('I am no longer mimicking {0} in following room:\n{1}\nNo one\'s messages will appear as coming from them anymore. This means you can now ask me to mimic you in that room if you like!\n{2}', [mimic_user_info, room_info], offer_mimic())
 
 def received_token():
-    return 'Thanks for your access token! I can now mimic you.\nTo make me revoke this token, say "revoke".'
+    return 'Thanks for your access token! I can now mimic you. To make me revoke this token, say "revoke".\nTry saying "actions" to see a list of everything you can make me do.'
 
 def invalid_token():
     return 'Invalid access token!!'
