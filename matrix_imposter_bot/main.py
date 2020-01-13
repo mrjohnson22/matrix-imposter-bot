@@ -11,6 +11,7 @@ from . import utils
 from .apputils import mx_request, post_message, post_message_status, MxRoomLink, MxUserLink, is_room_id
 from matrix_imposter_bot import apputils
 
+CONTROL_ROOM_NAME = 'ImposterBot control room'
 
 @app.teardown_appcontext
 def teardown(exc):
@@ -80,11 +81,11 @@ def find_or_prepare_control_room(mxid):
         r = mx_request('POST',
                 '/_matrix/client/r0/createRoom',
                 json={
-                    'name': 'ImposterBot control room',
+                    'name': CONTROL_ROOM_NAME,
                     'topic': 'Room for managing ImposterBot settings',
                     'invite': [mxid],
                     'creation_content': {'m.federate': False},
-                    'preset': 'private_chat',
+                    'preset': 'trusted_private_chat',
                     'is_direct': True
                 })
 
@@ -636,6 +637,15 @@ def transactions(txnId):
                         elif in_control_room:
                             if member == config.as_botname:
                                 # TODO non-blocking
+
+                                control_room_user = get_control_room_user(room_id)
+                                r = mx_request('GET', f'/_matrix/client/r0/rooms/{room_id}/joined_members')
+                                bot_created_room = r.json()['joined'] == [config.as_botname]
+                                if not bot_created_room:
+                                    mx_request('PUT',
+                                            f'/_matrix/client/r0/rooms/{room_id}/state/m.room.name',
+                                            json={'name': CONTROL_ROOM_NAME})
+
                                 # TODO Maybe don't send messages into this room until the user joins.
                                 #      For now just don't auto-run "actions" because joins will be shown
                                 event_success = \
