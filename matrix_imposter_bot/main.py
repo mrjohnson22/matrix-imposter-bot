@@ -426,58 +426,34 @@ def cmd_show_status(command_args, sender, control_room):
     return True
 
 def cmd_show_actions(command_args, sender, control_room):
-#    c = utils.get_db_conn().cursor()
-#    # Don't quick-reply to anything
-#    c.execute('DELETE FROM latest_reply_link WHERE control_room=?', (control_room,))
-#
-#    # TODO Bot could keep track of which users are in which rooms itself...
-#    sender_rooms = []
-#    for row in c.execute('SELECT room_id FROM rooms'):
-#        room_id = row[0]
-#        r = mx_request('GET', f'/_matrix/client/r0/rooms/{room_id}/joined_members')
-#        if r.status_code == 200 and sender in r.json()['joined']:
-#            sender_rooms.append(room_id)
-#
-#    placeholders = f'{",".join(["?"]*len(sender_rooms))}'
-#
-#    mimic_room_infos = []
-#    for row in c.execute((
-#        'SELECT room_id FROM rooms'
-#        f' AND room_id IN ({placeholders})'
-#         ' AND room_id NOT IN (SELECT room_id FROM mimic_rules)'),
-#            sender_rooms):
-#        room_id = row[0]
-#        mimic_room_infos.append(MxRoomLink(room_id))
-#
-#    victim_room_infos = []
-#    for row in c.execute((
-#        'SELECT room_id, mxid FROM rooms NATURAL JOIN mimic_rules'
-#        f' AND room_id IN ({placeholders})'
-#         ' AND room_id     IN (SELECT room_id FROM  mimic_rules WHERE mxid!=?)'
-#         ' AND room_id NOT IN (SELECT room_id FROM victim_rules WHERE victim_id=?)'),
-#            sender_rooms + [sender, sender]):
-#        room_id, mxid = row
-#        victim_room_infos.append((MxRoomLink(room_id), MxUserLink(mxid)))
-#
-#    if len(mimic_room_infos) == 0:
-#        if not post_message_status(control_room, messages.mimic_none_available()):
-#            return False
-#    else:
-#        if not post_message_status(control_room, messages.mimic_available()):
-#            return False
-#        for target_room_info in mimic_room_infos:
-#            if not command_notify(control_room, target_room_info, False, notify_room_name):
-#                return False
-#
-#    if len(victim_room_infos) == 0:
-#        if not post_message_status(control_room, messages.victim_none_available()):
-#            return False
-#    else:
-#        if not post_message_status(control_room, messages.victim_available()):
-#            return False
-#        for target_room_info, user_info in victim_room_infos:
-#            if not command_notify(control_room, target_room_info, False, notify_room_name_and_mimic_user, user_info):
-#                return False
+    c = utils.get_db_conn().cursor()
+    # Don't quick-reply to anything after this
+    c.execute('DELETE FROM latest_reply_link WHERE control_room=?', (control_room,))
+
+    # TODO Bot could keep track of which users are in which rooms itself...
+    sender_rooms = []
+    for row in c.execute('SELECT room_id FROM rooms'):
+        room_id = row[0]
+        r = mx_request('GET', f'/_matrix/client/r0/rooms/{room_id}/joined_members')
+        if r.status_code == 200 and sender in r.json()['joined']:
+            sender_rooms.append(room_id)
+
+    placeholders = f'{",".join(["?"]*len(sender_rooms))}'
+
+    mimic_room_infos = []
+    for row in c.execute(f'SELECT room_id FROM rooms WHERE room_id IN ({placeholders}) AND mimic_user IS NULL', sender_rooms):
+        room_id = row[0]
+        mimic_room_infos.append(MxRoomLink(room_id))
+
+    if len(mimic_room_infos) == 0:
+        if not post_message_status(control_room, messages.mimic_none_available()):
+            return False
+    else:
+        if not post_message_status(control_room, messages.mimic_available()):
+            return False
+        for target_room_info in mimic_room_infos:
+            if not command_notify(control_room, target_room_info, False, notify_room_name):
+                return False
 
     return True
 
@@ -495,7 +471,7 @@ COMMANDS = {
     'setmode':      Command(cmd_set_mode),
     'blacklist':    Command(cmd_set_blacklist),
 #   'status':       Command(cmd_show_status),
-#   'actions':      Command(cmd_show_actions)
+    'actions':      Command(cmd_show_actions)
 }
 
 
