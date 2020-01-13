@@ -75,7 +75,7 @@ def get_link_fmt_pair(template, linkables, *args):
     return (plain, html)
 
 
-room_pattern = re.compile('[#!][^:]+:.*')
+room_pattern = re.compile('[#!][^:]+:[a-z0-9._:]+')
 def is_room_id(room_id):
     return bool(room_pattern.fullmatch(room_id))
 

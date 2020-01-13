@@ -9,7 +9,6 @@ from . import config
 from . import messages
 from . import utils
 from .apputils import mx_request, post_message, post_message_status, MxRoomLink, MxUserLink, is_room_id
-from matrix_imposter_bot import apputils
 
 CONTROL_ROOM_NAME = 'ImposterBot control room'
 
@@ -195,7 +194,7 @@ def run_command(command_text, sender, control_room, replied_event=None):
         return command.func(command_args, sender, control_room)
     else:
         target_room = None
-        if len(command_args) >= 1 and apputils.is_room_id(command_args[0]):
+        if len(command_args) >= 1 and is_room_id(command_args[0]):
             room_arg = command_args.pop(0)
             if room_arg[0] == '#':
                 room_alias = room_arg.replace('#', '%23')
@@ -294,7 +293,7 @@ def cmd_unset_user(command_args, sender, control_room, target_room_info):
     else:
         return post_message_status(control_room,
             *(messages.never_mimicked(target_room_info) if c.rowcount == 1 else messages.never_mimicked(target_room_info)))
-        
+
 def cmd_set_mode(command_args, sender, control_room, target_room_info):
     if len(command_args) < 1:
         return post_message_status(control_room, messages.invalid_mode())
@@ -336,7 +335,7 @@ def cmd_set_mode(command_args, sender, control_room, target_room_info):
             c.execute('INSERT INTO response_modes VALUES (?,?,?)', (sender, target_room_info.id, replace))
         else:
             c.execute('UPDATE response_modes SET replace=? WHERE mimic_user=? AND room_id=?', (replace, sender, target_room_info.id))
-        
+
         mfunc = messages.set_response_mode_in_room if not noop else messages.same_response_mode_in_room
         return post_message_status(control_room, *mfunc(replace, target_room_info))
 
