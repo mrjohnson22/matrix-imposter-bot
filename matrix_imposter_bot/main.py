@@ -82,6 +82,37 @@ def is_user_in_monitored_room(mxid, room_id):
 
     return mxid in r.json()['joined']
 
+def get_rooms_for_user(mxid):
+    # TODO consider caching room memberships in the DB
+    room_list = []
+    c = utils.get_db_conn().cursor()
+    for row in c.execute('SELECT room_id FROM rooms'):
+        room_id = row[0]
+        r = mx_request('GET', f'/_matrix/client/r0/rooms/{room_id}/joined_members')
+        if r.status_code == 200 and mxid in r.json()['joined']:
+            room_list.append(room_id)
+    return room_list
+
+def get_placeholders_for_room_list(room_list):
+    return f'{",".join(["?"]*len(room_list))}'
+
+
+def is_user_blacklisted(target_user, mimic_user, room_id):
+    c = utils.get_db_conn().cursor()
+    c.execute('SELECT blacklist FROM blacklists WHERE mimic_user=? AND room_id=?', (mimic_user, room_id))
+    row = c.fetchone()
+    if row == None:
+        c.execute('SELECT blacklist FROM blacklists WHERE mimic_user=? AND room_id is NULL', (mimic_user,))
+        row = c.fetchone()
+    blacklist = row[0] if row != None else None
+
+    if blacklist != None:
+        for blacklist_word in blacklist.split():
+            if re.match(blacklist_word, target_user):
+                return True
+
+    return False
+
 
 def insert_control_room(mxid, room_id):
     utils.get_db_conn().execute('INSERT INTO control_rooms VALUES (?, ?, NULL)', (mxid, room_id))
@@ -397,60 +428,45 @@ def cmd_get_blacklist(command_args, sender, control_room, target_room_info):
         return post_message_status(control_room, blacklist if blacklist else messages.no_blacklist())
 
 def cmd_show_status(command_args, sender, control_room):
-#    c = utils.get_db_conn().cursor()
-#    # Don't quick-reply to anything
-#    c.execute('DELETE FROM latest_reply_link WHERE control_room=?', (control_room,))
-#
-#    mimic_room_infos = []
-#    for row in c.execute('SELECT room_id FROM mimic_rules WHERE mxid=?', (sender,)):
-#        room_id = row[0]
-#        mimic_room_infos.append(MxRoomLink(room_id))
-#
-#    echo_room_infos = []
-#    for row in c.execute('SELECT room_id, mxid FROM victim_rules NATURAL JOIN mimic_rules WHERE victim_id=? AND replace=0', (sender,)):
-#        room_id, mxid = row
-#        echo_room_infos.append((MxRoomLink(room_id), MxUserLink(mxid)))
-#
-#    replace_room_infos = []
-#    for row in c.execute('SELECT room_id, mxid FROM victim_rules NATURAL JOIN mimic_rules WHERE victim_id=? AND replace=1', (sender,)):
-#        room_id, mxid = row
-#        replace_room_infos.append((MxRoomLink(room_id), MxUserLink(mxid)))
-#
-#    if len(mimic_room_infos) == 0:
-#        if not post_message_status(control_room, messages.mimic_none()):
-#            return False
-#    else:
-#        if not post_message_status(control_room, messages.mimic_status()):
-#            return False
-#        for target_room_info in mimic_room_infos:
-#            c.execute('SELECT victim_id_pattern, replace FROM auto_victim_rules WHERE room_id=?', (target_room_info.id))
-#            row = c.fetchone()
-#            if row == None:
-#                if not command_notify(control_room, target_room_info, False, notify_room_name):
-#                    return False
-#            else:
-#                pattern, replace = row
-#                if not command_notify(control_room, target_room_info, False, notify_room_name):
-#
-#    if len(echo_room_infos) == 0:
-#        if not post_message_status(control_room, messages.echo_none()):
-#            return False
-#    else:
-#        if not post_message_status(control_room, messages.echo_status()):
-#            return False
-#        for target_room_info, user_info in echo_room_infos:
-#            if not command_notify(control_room, target_room_info, False, notify_room_name_and_mimic_user, user_info):
-#                return False
-#
-#    if len(replace_room_infos) == 0:
-#        if not post_message_status(control_room, messages.replace_none()):
-#            return False
-#    else:
-#        if not post_message_status(control_room, messages.replace_status()):
-#            return False
-#        for target_room_info, user_info in replace_room_infos:
-#            if not command_notify(control_room, target_room_info, False, notify_room_name_and_mimic_user, user_info):
-#                return False
+    # TODO allow requesting room-specific status
+    c = utils.get_db_conn().cursor()
+    # Don't quick-reply to anything
+    c.execute('DELETE FROM latest_reply_link WHERE control_room=?', (control_room,))
+
+    mimic_room_infos = []
+    for row in c.execute('SELECT room_id FROM rooms WHERE mimic_user=?', (sender,)):
+        room_id = row[0]
+        mimic_room_infos.append(MxRoomLink(room_id))
+
+    sender_rooms = get_rooms_for_user(sender)
+    placeholders = get_placeholders_for_room_list(sender_rooms)
+
+    # TODO distinguish between echo and replace
+    monitored_room_infos = []
+    for row in c.execute(f'SELECT room_id, mimic_user FROM rooms WHERE room_id IN ({placeholders}) AND mimic_user IS NOT ?', (*sender_rooms, sender)):
+        room_id, mimic_user = row
+        if not is_user_blacklisted(sender, mimic_user, room_id):
+            monitored_room_infos.append((MxRoomLink(room_id), MxUserLink(mimic_user)))
+
+    if len(mimic_room_infos) == 0:
+        if not post_message_status(control_room, messages.mimic_none()):
+            return False
+    else:
+        if not post_message_status(control_room, messages.mimic_status()):
+            return False
+        for target_room_info in mimic_room_infos:
+            if not command_notify(control_room, target_room_info, False, notify_room_name):
+                return False
+
+    if len(monitored_room_infos) == 0:
+        if not post_message_status(control_room, messages.monitor_none()):
+            return False
+    else:
+        if not post_message_status(control_room, messages.monitor_status()):
+            return False
+        for target_room_info, user_info in monitored_room_infos:
+            if not command_notify(control_room, target_room_info, False, notify_room_name_and_mimic_user, user_info):
+                return False
 
     return True
 
@@ -459,15 +475,8 @@ def cmd_show_actions(command_args, sender, control_room):
     # Don't quick-reply to anything after this
     c.execute('DELETE FROM latest_reply_link WHERE control_room=?', (control_room,))
 
-    # TODO Bot could keep track of which users are in which rooms itself...
-    sender_rooms = []
-    for row in c.execute('SELECT room_id FROM rooms'):
-        room_id = row[0]
-        r = mx_request('GET', f'/_matrix/client/r0/rooms/{room_id}/joined_members')
-        if r.status_code == 200 and sender in r.json()['joined']:
-            sender_rooms.append(room_id)
-
-    placeholders = f'{",".join(["?"]*len(sender_rooms))}'
+    sender_rooms = get_rooms_for_user(sender)
+    placeholders = get_placeholders_for_room_list(sender_rooms)
 
     mimic_room_infos = []
     for row in c.execute(f'SELECT room_id FROM rooms WHERE room_id IN ({placeholders}) AND mimic_user IS NULL', sender_rooms):
@@ -500,7 +509,7 @@ COMMANDS = {
     'setmode':      Command(cmd_set_mode),
     'blacklist':    Command(cmd_set_blacklist),
     'getblacklist': Command(cmd_get_blacklist),
-#   'status':       Command(cmd_show_status),
+    'status':       Command(cmd_show_status),
     'actions':      Command(cmd_show_actions)
 }
 
@@ -781,19 +790,8 @@ def transactions(txnId):
                                     # Never replay the mimic user's own messages
                                     mimic_user = None
 
-                                if mimic_user != None and access_token != None:
-                                    c.execute('SELECT blacklist FROM blacklists WHERE mimic_user=? AND room_id=?', (mimic_user, room_id))
-                                    row = c.fetchone()
-                                    if row == None:
-                                        c.execute('SELECT blacklist FROM blacklists WHERE mimic_user=? AND room_id is NULL', (mimic_user,))
-                                        row = c.fetchone()
-                                    blacklist = row[0] if row != None else None
-
-                                    if blacklist != None:
-                                        for blacklist_word in blacklist.split():
-                                            if re.match(blacklist_word, sender):
-                                                mimic_user = None
-                                                break
+                                if mimic_user != None and access_token != None and is_user_blacklisted(sender, mimic_user, room_id):
+                                    mimic_user = None
 
                         if mimic_user != None and access_token != None:
                             sender_info = MxUserLink(sender)

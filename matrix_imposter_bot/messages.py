@@ -134,20 +134,14 @@ def mimic_available():
 def mimic_none():
     return 'I am not mimicking you in any rooms!'
 
-def echo_none():
-    return 'I am not echoing you in any rooms!'
-
-def replace_none():
-    return 'I am not replacing your messages in any rooms!'
-
 def mimic_status():
     return 'I am mimicking you in the following rooms. Reply "stopit" to the room you want me to stop mimicking you in.'
 
-def echo_status():
-    return 'I am echoing you in the following rooms. Reply "stopit" to the room you want me to stop echoing you in.'
+def monitor_none():
+    return 'I am not repeating your messages in any rooms!'
 
-def replace_status():
-    return 'I am replacing your messages in the following rooms. Reply "stopit" to the room you want me to stop replacing your messages in.'
+def monitor_status():
+    return 'I am repeating your messages in the following rooms.'
 
 def room_name(room_info):
     return get_link_fmt_pair('{}', [room_info])
