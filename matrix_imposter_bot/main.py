@@ -69,6 +69,20 @@ def get_listening_room_users(room_id, exclude_users=[]):
     return users.difference(exclude_users).intersection(listening_users)
 
 
+def is_user_in_monitored_room(mxid, room_id):
+    # TODO consider caching room memberships in the DB
+    c = utils.get_db_conn().cursor()
+    c.execute('SELECT 1 FROM rooms WHERE room_id=?', (room_id,))
+    if not utils.fetchone_single(c):
+        return False
+
+    r = mx_request('GET', f'/_matrix/client/r0/rooms/{room_id}/joined_members')
+    if r.status_code != 200:
+        return False
+
+    return mxid in r.json()['joined']
+
+
 def insert_control_room(mxid, room_id):
     utils.get_db_conn().execute('INSERT INTO control_rooms VALUES (?, ?, NULL)', (mxid, room_id))
 
@@ -216,7 +230,7 @@ def run_command(command_text, sender, control_room, replied_event=None):
 
         return command.func(
             command_args, sender, control_room,
-            MxRoomLink(target_room) if target_room and is_bot_in_room(target_room) else None)
+            MxRoomLink(target_room) if target_room and is_user_in_monitored_room(sender, target_room) else None)
 
 
 def cmd_register_token(command_args, sender, control_room):
@@ -494,10 +508,6 @@ COMMANDS = {
 def bot_leave_room(room_id):
     r = mx_request('POST', f'/_matrix/client/r0/rooms/{room_id}/leave')
     return r.status_code == 200
-
-def is_bot_in_room(room_id):
-    r = mx_request('GET', '/_matrix/client/r0/joined_rooms')
-    return room_id in r.json()['joined_rooms'] if r.status_code == 200 else False
 
 def user_leave_room(member, room_left):
     event_success = True
