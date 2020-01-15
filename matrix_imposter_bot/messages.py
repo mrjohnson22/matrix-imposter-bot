@@ -22,6 +22,9 @@ def invalid_command():
 def ask_for_token():
     return 'You can give me your token by saying "token <your-token-here>".'
 
+def empty_token():
+    return 'Must provide a token!'
+
 def offer_mimic():
     return 'Reply "mimicMe" to this message to make me post other people\'s messages on your behalf in that room.'
 
@@ -107,6 +110,9 @@ def default_response_mode_in_room(room_info):
 def same_default_response_mode_in_room(room_info):
     return get_link_fmt_pair('I was already following your global preference for how to handle people\'s messages in {}!', [room_info])
 
+def empty_blacklist():
+    return 'Must provide a blacklist!'
+
 def set_blacklist():
     return 'Global blacklist applied. I will not monitor messages sent by anyone matching the provided pattern.'
 
@@ -148,3 +154,14 @@ def room_name(room_info):
 
 def room_name_and_mimic_user(room_info, user_info):
     return get_link_fmt_pair('{}, as {}', [room_info, user_info])
+
+
+cmd_token = 'Provides me with your Matrix account\'s access token, so that I may post messages on your behalf.'
+cmd_revoke = 'Makes me forget about any access token you gave me.'
+cmd_mimicme = 'Makes me use your account to repost other people\'s messages in the specified room. (If no room is provided, I\'ll use the most recent room I mentioned.)'
+cmd_stopit = 'Makes me stop mimicking you in the specified room. (If you don\'t specify a room, I\'ll use the most recent room I mentioned.)'
+cmd_setmode = 'Sets whether or not I delete people\'s messages when I repost them. This can have a different setting per room.'
+cmd_blacklist = 'Sets which accounts I will never repost messages for. The blacklist is one or more regex patterns; user IDs that match any pattern will be blacklisted. This can have a different setting per room.'
+cmd_getblacklist = 'Returns your global blacklist, or if a room is specified, your blacklist for that room.'
+cmd_status = 'Returns a list of all rooms I am mimicking you in, and all rooms I am reposting your messages in.'
+cmd_actions = 'Returns a list of all rooms where you can ask me to mimic you in.'

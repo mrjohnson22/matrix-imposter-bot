@@ -264,10 +264,19 @@ def run_command(command_text, sender, control_room, replied_event=None):
             MxRoomLink(target_room) if target_room and is_user_in_monitored_room(sender, target_room) else None)
 
 
+def cmd_help(command_args, sender, control_room):
+    text = ''
+    for command_word, command in COMMANDS.items():
+        if command.help != None:
+            example = f'{command.example} :' if command.example else ':'
+            text += f'> {command_word} {example} {command.help}\n\n'
+
+    return post_message_status(control_room, text)
+
 def cmd_register_token(command_args, sender, control_room):
     # Validate token first
     if len(command_args) < 1:
-        return post_message_status(control_room, 'Must provide a token!')
+        return post_message_status(control_room, messages.empty_token())
 
     access_token = command_args[0]
     r = mx_request('GET', '/_matrix/client/r0/account/whoami', access_token=access_token)
@@ -388,7 +397,7 @@ def cmd_set_mode(command_args, sender, control_room, target_room_info):
 
 def cmd_set_blacklist(command_args, sender, control_room, target_room_info):
     if len(command_args) < 1:
-        return post_message_status(control_room, 'Must provide a blacklist!')
+        return post_message_status(control_room, messages.empty_blacklist())
 
     c = utils.get_db_conn().cursor()
 
@@ -497,20 +506,23 @@ def cmd_show_actions(command_args, sender, control_room):
 
 class Command:
     # TODO template and description
-    def __init__(self, func, uses_reply_link=False):
+    def __init__(self, func, example, help, uses_reply_link=False):
         self.func = func
+        self.example = example
+        self.help = help
         self.uses_reply_link = uses_reply_link
 
 COMMANDS = {
-    'token':        Command(cmd_register_token),
-    'revoke':       Command(cmd_revoke_token),
-    'mimicme':      Command(cmd_set_mimic_user, True),
-    'stopit':       Command(cmd_unset_user, True),
-    'setmode':      Command(cmd_set_mode),
-    'blacklist':    Command(cmd_set_blacklist),
-    'getblacklist': Command(cmd_get_blacklist),
-    'status':       Command(cmd_show_status),
-    'actions':      Command(cmd_show_actions)
+    'help':         Command(cmd_help, None, None),
+    'token':        Command(cmd_register_token, '<access-token>', messages.cmd_token),
+    'revoke':       Command(cmd_revoke_token, None, messages.cmd_revoke),
+    'mimicme':      Command(cmd_set_mimic_user, '[room_alias_or_id]', messages.cmd_mimicme, True),
+    'stopit':       Command(cmd_unset_user, '[room_alias_or_id]', messages.cmd_stopit, True),
+    'setmode':      Command(cmd_set_mode, '[room_alias_or_id] echo|replace|default', messages.cmd_setmode),
+    'blacklist':    Command(cmd_set_blacklist, '[room_alias_or_id] <user-id-patterns>', messages.cmd_blacklist),
+    'getblacklist': Command(cmd_get_blacklist, '[room_alias_or_id]', messages.cmd_getblacklist),
+    'status':       Command(cmd_show_status, None, messages.cmd_status),
+    'actions':      Command(cmd_show_actions, None, messages.cmd_actions)
 }
 
 
