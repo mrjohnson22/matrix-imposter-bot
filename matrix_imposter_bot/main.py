@@ -452,7 +452,7 @@ def cmd_show_status(command_args, sender, control_room):
 
     # TODO distinguish between echo and replace
     monitored_room_infos = []
-    for row in c.execute(f'SELECT room_id, mimic_user FROM rooms WHERE room_id IN ({placeholders}) AND mimic_user IS NOT ?', (*sender_rooms, sender)):
+    for row in c.execute(f'SELECT room_id, mimic_user FROM rooms WHERE room_id IN ({placeholders}) AND mimic_user IS NOT NULL OR ?', (*sender_rooms, sender)):
         room_id, mimic_user = row
         if not is_user_blacklisted(sender, mimic_user, room_id):
             monitored_room_infos.append((MxRoomLink(room_id), MxUserLink(mimic_user)))
