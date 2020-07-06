@@ -1,3 +1,10 @@
+import atexit
+import signal
+import sys
+from threading import Timer
+
+import pkg_resources
+import sqlite3
 from flask import Flask
 
 from . import config
@@ -5,7 +12,20 @@ from . import utils
 from .apputils import mx_request
 
 
+def run_sql(filename):
+    conn = sqlite3.connect(config.db_name)
+    c = conn.cursor()
+    cmds = pkg_resources.resource_string(__name__, 'sql/' + filename).decode('utf8')
+    for cmd in cmds.split(';\n\n'):
+        c.execute(cmd)
+    conn.commit()
+    conn.close()
+
+
 def initial_setup():
+    # TODO use alembic
+    run_sql('db_prep.sql')
+
     # TODO non-blocking and error checking
     r = mx_request('GET', f'/_matrix/client/r0/profile/{config.as_botname}/displayname', wait=True)
     if r.status_code == 404:
@@ -48,14 +68,23 @@ def leave_bad_rooms():
                 mx_request('POST', f'/_matrix/client/r0/rooms/{room_id}/leave')
 
 
-# TODO use an event loop instead
-from threading import Timer
+timer = None
 def update_presence():
     mx_request('PUT', f'/_matrix/client/r0/presence/{config.as_botname}/status', wait=True,
         json={'presence': 'online'}, verbose=False)
 
-    t = Timer(20.0, update_presence)
-    t.start()
+    global timer
+    timer = Timer(20.0, update_presence)
+    timer.start()
+
+def sighandler(sig, frame):
+    print(f'Caught signal {sig}')
+    signal.signal(sig, signal.SIG_IGN)
+
+    global timer
+    if timer != None:
+        timer.cancel()
+        sys.exit(0)
 
 
 def on_exit():
@@ -70,7 +99,8 @@ def prep():
     # TODO is there any other missed state to sync?
     leave_bad_rooms()
 
+    for sig in [signal.SIGINT, signal.SIGTERM, signal.SIGQUIT]:
+        signal.signal(sig, sighandler)
     update_presence()
 
-    import atexit
     atexit.register(on_exit)
