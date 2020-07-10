@@ -159,6 +159,25 @@ def get_control_room_user(room_id):
         utils.get_db_conn().execute('SELECT mxid FROM control_rooms WHERE room_id=?', (room_id,)))
 
 
+def get_mimic_info_for_room_and_sender(room_id, sender):
+    mimic_user = None
+    access_token = None
+
+    c = utils.get_db_conn().cursor()
+    c.execute('SELECT mimic_user, access_token FROM rooms JOIN control_rooms ON rooms.mimic_user=control_rooms.mxid WHERE rooms.room_id=?', (room_id,))
+    row = c.fetchone()
+    if row != None:
+        mimic_user, access_token = row
+        if mimic_user == sender:
+            # Never replay the mimic user's own messages
+            mimic_user = None
+
+        if mimic_user != None and access_token != None and is_user_blacklisted(sender, mimic_user, room_id):
+            mimic_user = None
+
+    return mimic_user, access_token
+
+
 def control_room_notify(user_to, target_room_info, notify_fn, *args):
     control_room = find_existing_control_room(user_to)
     if control_room == None:
@@ -703,10 +722,15 @@ def transactions(txnId):
                                     event_success = False
 
                             else:
+                                mimic_user, access_token = get_mimic_info_for_room_and_sender(room_id, sender)
+                                if mimic_user != None and access_token != None:
+                                    sender_info = MxUserLink(sender)
+                                    event_success = post_message_status(room_id, *messages.user_joined_msg(sender_info), access_token)
+
                                 # Notify the user that they joined a room that the bot is in.
                                 event_success = control_room_notify(
                                     member, MxRoomLink(room_id),
-                                    notify_user_joined)
+                                    notify_user_joined) and event_success
 
                 elif membership == 'leave':
                     in_control_room = is_control_room(room_id)
@@ -756,8 +780,16 @@ def transactions(txnId):
                             else:
                                 event_success = False
 
-                            if room_empty and event_success:
-                                event_success = bot_leave_room(room_id)
+                            if event_success:
+                                if not room_empty:
+                                    # If the room is not empty, relay a message saying the user left.
+                                    mimic_user, access_token = get_mimic_info_for_room_and_sender(room_id, sender)
+                                    if mimic_user != None and access_token != None:
+                                        sender_info = MxUserLink(sender)
+                                        post_message(room_id, *messages.user_left_msg(sender_info), access_token)
+                                else:
+                                    event_success = bot_leave_room(room_id)
+
 
 
             elif stype == 'message':
@@ -794,16 +826,7 @@ def transactions(txnId):
 
                         c.execute('SELECT 1 FROM generated_messages WHERE event_id=? AND room_id=?', (event_id, room_id))
                         if c.fetchone() == None:
-                            c.execute('SELECT mimic_user, access_token FROM rooms JOIN control_rooms ON rooms.mimic_user=control_rooms.mxid WHERE rooms.room_id=?', (room_id,))
-                            row = c.fetchone()
-                            if row != None:
-                                mimic_user, access_token = row
-                                if mimic_user == sender:
-                                    # Never replay the mimic user's own messages
-                                    mimic_user = None
-
-                                if mimic_user != None and access_token != None and is_user_blacklisted(sender, mimic_user, room_id):
-                                    mimic_user = None
+                            mimic_user, access_token = get_mimic_info_for_room_and_sender(room_id, sender)
 
                         if mimic_user != None and access_token != None:
                             sender_info = MxUserLink(sender)

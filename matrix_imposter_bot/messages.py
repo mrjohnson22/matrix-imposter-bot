@@ -47,6 +47,12 @@ def user_joined(room_info, mimic_user_info):
             'You just joined a room that I am present in:\n{}\n' + (offer_mimic() if not mimic_user_info.id else 'I am already mimicking {} in this room.'),
             [room_info, mimic_user_info])
 
+def user_joined_msg(user_info):
+    return get_link_fmt_pair('{} joined the conversation', [user_info])
+
+def user_left_msg(user_info):
+    return get_link_fmt_pair('{} left the conversation', [user_info])
+
 def bot_left(room_info):
     return get_link_fmt_pair('I just left this room:\n{}\nMy reign of terror in that room is over. I won\'t alter messages in it anymore.', [room_info])
 

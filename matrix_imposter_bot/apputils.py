@@ -140,13 +140,16 @@ def get_display_name(mxid):
     return r.json()['displayname'] if r.status_code == 200 else None
 
 
-def post_message(room_id, message_plain, message_html=None):
+def post_message(room_id, message_plain, message_html=None, access_token=None):
     json={'body': message_plain, 'msgtype': 'm.text'}
     if message_html != None:
         json['format'] = 'org.matrix.custom.html'
         json['formatted_body'] = message_html
 
-    return mx_request('PUT', f'/_matrix/client/r0/rooms/{room_id}/send/m.room.message/txnId', json)
+    return mx_request('PUT',
+            f'/_matrix/client/r0/rooms/{room_id}/send/m.room.message/txnId',
+            json,
+            access_token=access_token)
 
 def post_message_status(*args, **kwargs):
     return post_message(*args, **kwargs).status_code == 200
