@@ -671,8 +671,19 @@ def transactions(txnId):
                 elif membership == 'join':
                     if utils.get_from_dict(event, 'prev_content', 'membership') == 'join':
                         # Do nothing if this is a repeat of a previous join event
-                        # TODO keep track of users who change their display names!
-                        pass
+                        # If not in a control room, post message for a user changing their name
+                        if not is_control_room(room_id):
+                            mimic_user, access_token = get_mimic_info_for_room_and_sender(room_id, sender)
+                            if mimic_user != None and access_token != None:
+                                old_sender_name = utils.get_from_dict(event, 'prev_content', 'displayname')
+                                new_sender_name = utils.get_from_dict(event, 'content', 'displayname')
+                                # TODO Riot Web always renders pills with their current name, not with the text you give it...
+                                #old_sender_info = MxUserLink(sender, old_sender_name)
+                                new_sender_info = MxUserLink(sender, new_sender_name)
+                                event_success = post_message_status(
+                                    room_id,
+                                    *messages.user_renamed_msg(old_sender_name, new_sender_info),
+                                    access_token)
 
                     else:
                         in_control_room = is_control_room(room_id)

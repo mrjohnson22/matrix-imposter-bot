@@ -53,6 +53,10 @@ def user_joined_msg(user_info):
 def user_left_msg(user_info):
     return get_link_fmt_pair('{} left the conversation', [user_info])
 
+# TODO Riot Web always renders user pills with their current name, not with the text you give it...
+def user_renamed_msg(old_user_name, new_user_info):
+    return get_link_fmt_pair('{1} changed their display name to {0}', [new_user_info], old_user_name)
+
 def bot_left(room_info):
     return get_link_fmt_pair('I just left this room:\n{}\nMy reign of terror in that room is over. I won\'t alter messages in it anymore.', [room_info])
 

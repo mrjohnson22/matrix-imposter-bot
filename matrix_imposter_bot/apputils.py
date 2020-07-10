@@ -18,9 +18,14 @@ class Linkable:
         return self._text
 
 class MxLinkable(Linkable):
-    def __init__(self, id):
+    def __init__(self, id, text=None):
         super().__init__(None, None)
         self.id = id # invoke setter
+        # TODO Riot Web always renders pills with their current name, not with the text you give it...
+        if text != None:
+            self._text = text
+            self._dirty = False
+            self._link = get_mx_link(self._id, self._text)
 
     @property
     def id(self):
