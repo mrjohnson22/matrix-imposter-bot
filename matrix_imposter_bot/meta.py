@@ -79,7 +79,6 @@ def update_presence():
 
 def sighandler(sig, frame):
     print(f'Caught signal {sig}')
-    signal.signal(sig, signal.SIG_IGN)
 
     global timer
     if timer != None:
