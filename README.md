@@ -24,11 +24,12 @@ The bot tries to walk you through how to set it up, but here are the starting st
 A `help` command is available as well, which explains other commands. The most important is `blacklist`, which accepts one or more patterns of Matrix user IDs to *not* repeat messages for.
 
 ## Example use case
-This bot can be used to give relay-bot capabilities to the [mautrix-facebook](https://github.com/tulir/mautrix-facebook) bridge. This means that Matrix users not logged into the mautrix-facebook bridge can participate in portal rooms bridged to Facebook chats.
+This bot can be used to give relay-bot capabilities to the [mautrix-facebook](https://github.com/mautrix/facebook) bridge, with a few tweaks to that bridge. This means that Matrix users not logged into the mautrix-facebook bridge can participate in portal rooms bridged to Facebook chats.
 
+* Use [this fork](https://github.com/mrjohnson22/mautrix-facebook/tree/outbound-only-rebased) of mautrix-facebook (or clone the original bridge and use the fork as a remote), which allows the usage of "outbound-only" accounts that can send (but not receive) messages from a Facebook account that another Matrix user is already logged in as.
 * In your mautrix-facebook config, set `allow_invites` to `true`, which allows you to invite arbitrary Matrix users to portal rooms managed by the bridge.
 * Create an alt of your Matrix account.
-* [Follow these steps](https://github.com/tulir/mautrix-facebook/wiki/Authentication) to log into Facebook with both your main Matrix account and your alt account.
+* [Follow these steps](https://docs.mau.fi/bridges/python/facebook/authentication.html) to log into Facebook with both your main Matrix account and your alt account.
 * With both accounts, join any portal rooms of Facebook chats you want to have relay support in.
 * With your alt account:
   * Start a direct chat with `@_imposter_bot:your_domain`, and give it your alt account's access token.
@@ -38,4 +39,4 @@ This bot can be used to give relay-bot capabilities to the [mautrix-facebook](ht
 
 You can now use your main account to invite & chat with other Matrix users rooms in Facebook portal rooms! Any messages sent by other Matrix users will be re-sent by your alt account, which means those messages will get bridged to Facebook. You and other Matrix users may set your alt account as an "ignored user" to avoid seeing duplicate messages (the original message and the reposted one).
 
-At this point, it is also possible to plumb the room to other services via bridges that support both plumbing and relaying, such as [matrix-appservice-discord](https://github.com/Half-Shot/matrix-appservice-discord). Note that to prevent duplicate messages from being seen by those services, any other bridge acting as a relay-bot must be configured to blacklist messages sent by this bot.
+At this point, it is also possible to plumb the room to other services via bridges that support both plumbing and relaying, such as [matrix-appservice-discord](https://github.com/Half-Shot/matrix-appservice-discord). Note that to prevent duplicate messages from being seen by those services, any other bridge acting as a relay-bot must be configured to blacklist messages sent by this bot. For matrix-appservice-discord, [this PR](https://github.com/Half-Shot/matrix-appservice-discord/pull/576) may be used to achieve that.
