@@ -549,7 +549,9 @@ COMMANDS = {
 
 def bot_leave_room(room_id):
     r = mx_request('POST', f'/_matrix/client/r0/rooms/{room_id}/leave')
-    return r.status_code == 200
+    # If 403, bot was somehow removed from the room without it knowing.
+    # Don't hard-fail on that, otherwise we'll never recover!!
+    return r.status_code == 200 or r.status_code == 403
 
 def user_leave_room(member, room_left):
     event_success = True
